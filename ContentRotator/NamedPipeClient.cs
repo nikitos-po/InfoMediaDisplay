@@ -3,6 +3,11 @@ using System.IO;
 using System.IO.Pipes;
 using System.Threading;
 
+/// <summary>
+/// Класс управления проигрывателем через именованные каналы4
+/// 
+/// </summary>
+
 class NamedPipeClient
 {
     private static string _pipeName;

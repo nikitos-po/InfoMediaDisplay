@@ -9,12 +9,14 @@ namespace MpvWatchdogApp
 {
     class MpvWatchdog
     {
-        private static string mpvExecutable = "mpv.exe";
+        // Переменные, которые нужно вынести в конфигурационные файлы
+        private static string mpvExecutable = @"C:\APP\mpv\mpv.exe";
         private static string pipeName = @"\\.\pipe\mpv_control_pipe";
-        private static string startupPlaylistPath = @"c:\data\VideoKiosk\01.txt";
+        private static string startupPlaylistPath = @"c:\data\VideoKiosk\local\default.txt";
         private static string mpvLogPath = @"c:\data\VideoKiosk\mpv.log";
-        private static string mpvArguments = @$"--audio=no --border=no --title-bar=no --loop-playlist=inf --fullscreen --terminal=no --msg-level=all=warn --log-file={mpvLogPath} --playlist={startupPlaylistPath} --input-ipc-server={pipeName}";  // default with named pipe
         private static int checkIntervalMs = 3000; // Check every 3 seconds
+        //
+        private static string mpvArguments = @$"--audio=no --border=no --title-bar=no --loop-playlist=inf --fullscreen --terminal=no --msg-level=all=warn --log-file={mpvLogPath} --playlist={startupPlaylistPath} --input-ipc-server={pipeName}";
 
         static async Task Main(string[] args)
         {
@@ -22,15 +24,18 @@ namespace MpvWatchdogApp
             if (args.Length > 0)
                 mpvExecutable = args[0];
             if (args.Length > 1)
-                mpvArguments = args[1];
+                startupPlaylistPath = args[1];
             if (args.Length > 2)
                 pipeName = args[2];
+            if(args.Length > 3)
+                mpvLogPath = args[3];
 
             Console.WriteLine("MPV Watchdog Started.");
             Console.WriteLine($"Executable: {mpvExecutable}");
-            Console.WriteLine($"Arguments: {mpvArguments}");
+            Console.WriteLine($"Startup Playlist Path: {startupPlaylistPath}");
             Console.WriteLine($"Checking every {checkIntervalMs} ms.");
             Console.WriteLine($"Named pipe to check: {pipeName}\n");
+            Console.WriteLine($"MPV logfile: {mpvLogPath}\n");
 
             using CancellationTokenSource cts = new CancellationTokenSource();
             Console.CancelKeyPress += (sender, e) =>
@@ -99,6 +104,9 @@ namespace MpvWatchdogApp
 
         private static Process StartMpv()
         {
+            // Проверим, существует ли стартовый плейлист
+            if (!File.Exists(startupPlaylistPath))
+                File.Create(startupPlaylistPath);
             try
             {
                 ProcessStartInfo startInfo = new ProcessStartInfo
