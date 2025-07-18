@@ -1,25 +1,22 @@
 ﻿using ContentRotator;
+using Microsoft.Extensions.Configuration;
+using MpvWatchdogApp;
 
-// Переменные, которые нужно вынести в конфигурационные файлы
-var remoteContentFolderPath = @"c:\data\VideoKiosk\remote";
-var localContentFolderPath = @"c:\data\VideoKiosk\local";
-var pipeName = @"mpv_control_pipe";
-
-// Optional: parse args for executable path and arguments
-if (args.Length > 0)
-    remoteContentFolderPath = args[0];
-if (args.Length > 1)
-    localContentFolderPath = args[1];
-if (args.Length > 2)
-    pipeName = args[2];
+var config = new ConfigurationBuilder()
+                           .SetBasePath(AppContext.BaseDirectory) // base directory to find appsettings.json
+                           .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
+                           .Build();
+// Bind config to strongly-typed class
+var settings = new AppSettings();
+config.Bind(settings);
 
 Console.WriteLine("Content Rotator Started.");
-Console.WriteLine($"Remote content folder: {remoteContentFolderPath}");
-Console.WriteLine($"Local cache folder: {localContentFolderPath}");
-Console.WriteLine($"Named pipe to send commands: {pipeName}\n");
+Console.WriteLine($"Remote content folder: {settings.RemoteContentFolderPath}");
+Console.WriteLine($"Local cache folder: {settings.LocalContentFolderPath}");
+Console.WriteLine($"Named pipe to send commands: {settings.PipeName}");
 //
-var controlPipe = new NamedPipeClient(pipeName);
-var сontentManager = new ContentManager(localContentFolderPath, remoteContentFolderPath);
+var controlPipe = new NamedPipeClient(settings.PipeName);
+var сontentManager = new ContentManager(settings);
 
 // обновим локальный кэш
 var newPlaylistPath = сontentManager.MakeLocalCache();

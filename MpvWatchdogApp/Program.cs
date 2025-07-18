@@ -1,41 +1,28 @@
-﻿using System;
-using System.Diagnostics;
-using System.IO;
+﻿using System.Diagnostics;
 using System.IO.Pipes;
-using System.Threading;
-using System.Threading.Tasks;
+using Microsoft.Extensions.Configuration;
 
 namespace MpvWatchdogApp
 {
     class MpvWatchdog
     {
-        // Переменные, которые нужно вынести в конфигурационные файлы
-        private static string mpvExecutable = @"C:\APP\mpv\mpv.exe";
-        private static string pipeName = @"\\.\pipe\mpv_control_pipe";
-        private static string startupPlaylistPath = @"c:\data\VideoKiosk\local\default.txt";
-        private static string mpvLogPath = @"c:\data\VideoKiosk\mpv.log";
-        private static int checkIntervalMs = 3000; // Check every 3 seconds
-        //
-        private static string mpvArguments = @$"--audio=no --border=no --title-bar=no --loop-playlist=inf --fullscreen --terminal=no --msg-level=all=warn --log-file={mpvLogPath} --playlist={startupPlaylistPath} --input-ipc-server={pipeName}";
-
+        private static AppSettings Settings = new AppSettings();
         static async Task Main(string[] args)
         {
-            // Optional: parse args for executable path and arguments
-            if (args.Length > 0)
-                mpvExecutable = args[0];
-            if (args.Length > 1)
-                startupPlaylistPath = args[1];
-            if (args.Length > 2)
-                pipeName = args[2];
-            if(args.Length > 3)
-                mpvLogPath = args[3];
+
+            var config = new ConfigurationBuilder()
+                            .SetBasePath(AppContext.BaseDirectory) // base directory to find appsettings.json
+                            .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
+                            .Build();
+            // Bind config to strongly-typed class
+            config.Bind(Settings);
 
             Console.WriteLine("MPV Watchdog Started.");
-            Console.WriteLine($"Executable: {mpvExecutable}");
-            Console.WriteLine($"Startup Playlist Path: {startupPlaylistPath}");
-            Console.WriteLine($"Checking every {checkIntervalMs} ms.");
-            Console.WriteLine($"Named pipe to check: {pipeName}\n");
-            Console.WriteLine($"MPV logfile: {mpvLogPath}\n");
+            Console.WriteLine($"Executable: {Settings.MpvExecutable}");
+            Console.WriteLine($"Startup Playlist Path: {Settings.StartupPlaylistPath}");
+            Console.WriteLine($"Checking every {Settings.CheckIntervalMs} ms.");
+            Console.WriteLine($"Named pipe to check: {Settings.PipeName}\n");
+            Console.WriteLine($"MPV logfile: {Settings.MpvLogPath}\n");
 
             using CancellationTokenSource cts = new CancellationTokenSource();
             Console.CancelKeyPress += (sender, e) =>
@@ -59,7 +46,7 @@ namespace MpvWatchdogApp
 
                 if (mpvRunning)
                 {
-                    pipeExists = await NamedPipeExistsAsync(pipeName, 10).ConfigureAwait(false);
+                    pipeExists = await NamedPipeExistsAsync(Settings.PipeName, 10).ConfigureAwait(false);
                 }
 
                 if (!mpvRunning)
@@ -93,7 +80,7 @@ namespace MpvWatchdogApp
 
                 try
                 {
-                    await Task.Delay(checkIntervalMs, token);
+                    await Task.Delay(Settings.CheckIntervalMs, token);
                 }
                 catch (TaskCanceledException)
                 {
@@ -104,14 +91,16 @@ namespace MpvWatchdogApp
 
         private static Process StartMpv()
         {
+            string mpvArguments = @$"--audio=no --border=no --title-bar=no --loop-playlist=inf --fullscreen --terminal=no --msg-level=all=warn --log-file={Settings.MpvLogPath} --playlist={Settings.StartupPlaylistPath} --input-ipc-server={Settings.PipeName}";
+            Console.WriteLine($"{ mpvArguments}");
             // Проверим, существует ли стартовый плейлист
-            if (!File.Exists(startupPlaylistPath))
-                File.Create(startupPlaylistPath);
+            if (!File.Exists(Settings.StartupPlaylistPath))
+                File.Create(Settings.StartupPlaylistPath);
             try
             {
                 ProcessStartInfo startInfo = new ProcessStartInfo
                 {
-                    FileName = mpvExecutable,
+                    FileName = Settings.MpvExecutable,
                     Arguments = mpvArguments,
                     UseShellExecute = false,
                     CreateNoWindow = true
@@ -149,9 +138,9 @@ namespace MpvWatchdogApp
             return false;
         }
 
-        private static Task<bool> NamedPipeExistsAsync(string fullPipeName, int timeoutMs)
+        private static Task<bool> NamedPipeExistsAsync(string pipeName, int timeoutMs)
         {
-            // fullPipeName e.g. "\\.\pipe\mpv_control_pipe"
+            // fullsettings.PipeName e.g. "\\.\pipe\mpv_control_pipe"
             // We connect using NamedPipeClientStream with tiny timeout to check existence
 
             return Task.Run(() =>
@@ -160,7 +149,7 @@ namespace MpvWatchdogApp
                 {
                     // The pipe name needed to create NamedPipeClientStream excludes the prefix \\.\pipe\
                     // so extract only the final pipe name part:
-                    string pipeShortName = ExtractPipeName(fullPipeName);
+                    string pipeShortName = ExtractPipeName(pipeName);
                     using (var pipeClient = new NamedPipeClientStream(".", pipeShortName, PipeDirection.Out))
                     {
                         pipeClient.Connect(timeoutMs);
@@ -184,7 +173,7 @@ namespace MpvWatchdogApp
 
         private static string ExtractPipeName(string fullPipeName)
         {
-            // Assume format \\.\pipe\<pipename>
+            // Assume format \\.\pipe\<settings.PipeName>
             var prefix = @"\\.\pipe\";
             if (fullPipeName.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
             {

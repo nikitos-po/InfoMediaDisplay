@@ -1,9 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using System.IO;
+﻿using Microsoft.Extensions.Configuration;
+using MpvWatchdogApp;
 
 namespace ContentRotator
 {
@@ -13,29 +9,22 @@ namespace ContentRotator
     /// </summary>
     public class ContentManager
     {
-        public static readonly string[] ContentSubfolders = { @"\a", @"\b" };
-        public static readonly string IncompleteTaskMarker = @"\incomplete";
-        public static readonly string DefaultPlayListName = @"\default.txt";
-        public static readonly string[] AlowedExtensions = { ".mp4", ".jpg", ".png" };
-
-        private readonly string _localContentFolderPath;
-        private readonly string _remoteContentFolderPath;
-        public ContentManager(string localContentFolderPath, string remoteContentFolderPath)
+        private readonly AppSettings _settings;
+        public ContentManager(AppSettings settings)
         {
-            if (string.IsNullOrWhiteSpace(localContentFolderPath))
-                throw new ArgumentException("Folder path cannot be null or whitespace.", nameof(localContentFolderPath));
+            _settings = settings;
 
-            if (!Directory.Exists(localContentFolderPath))
-                throw new DirectoryNotFoundException($"Folder does not exist: {localContentFolderPath}");
+            if (string.IsNullOrWhiteSpace(_settings.LocalContentFolderPath))
+                throw new ArgumentException("Folder path cannot be null or whitespace.", nameof(_settings.LocalContentFolderPath));
 
-            if (string.IsNullOrWhiteSpace(remoteContentFolderPath))
-                throw new ArgumentException("Folder path cannot be null or whitespace.", nameof(remoteContentFolderPath));
+            if (!Directory.Exists(_settings.LocalContentFolderPath))
+                throw new DirectoryNotFoundException($"Folder does not exist: {_settings.LocalContentFolderPath}");
 
-            if (!Directory.Exists(remoteContentFolderPath))
-                throw new DirectoryNotFoundException($"Folder does not exist: {remoteContentFolderPath}");
+            if (string.IsNullOrWhiteSpace(_settings.RemoteContentFolderPath))
+                throw new ArgumentException("Folder path cannot be null or whitespace.", nameof(_settings.RemoteContentFolderPath));
 
-            _localContentFolderPath = localContentFolderPath;
-            _remoteContentFolderPath = remoteContentFolderPath;
+            if (!Directory.Exists(_settings.RemoteContentFolderPath))
+                throw new DirectoryNotFoundException($"Folder does not exist: {_settings.RemoteContentFolderPath}");
         }
 
         public string[] LocalMediaContentFolders
@@ -43,9 +32,9 @@ namespace ContentRotator
             get
             {
                 List<String> result = new List<String>();
-                foreach (var subfolder in ContentSubfolders)
+                foreach (var subfolder in _settings.ContentSubfolders)
                 {
-                    string mediafolderPath = Path.Join(_localContentFolderPath, subfolder);
+                    string mediafolderPath = Path.Join(_settings.LocalContentFolderPath, subfolder);
                     result.Add(mediafolderPath);
                 }
                 return result.ToArray();
@@ -53,7 +42,7 @@ namespace ContentRotator
         }
         public string IncompleteCopyTaskMarker(string folderPath)
         {
-            return Path.Join(folderPath, IncompleteTaskMarker);
+            return Path.Join(folderPath, _settings.IncompleteTaskMarker);
         }
         /// <summary>
         /// Определяем первую пустую папку.
@@ -62,7 +51,7 @@ namespace ContentRotator
         /// <returns></returns>
         public string DetermineLocalMediaFolderPath()
         {
-            string mediafolderPath = _localContentFolderPath;
+            string mediafolderPath = _settings.LocalContentFolderPath;
             // Ищем пустую папку
             foreach (var subfolder in LocalMediaContentFolders)
             {
@@ -85,7 +74,7 @@ namespace ContentRotator
                     return subfolder;
                 }
             }
-            throw new ArgumentException("No sutable folders.", nameof(_localContentFolderPath));
+            throw new ArgumentException("No sutable folders.", nameof(_settings.LocalContentFolderPath));
         }
 
         /// <summary>
@@ -114,7 +103,7 @@ namespace ContentRotator
         public string MakeLocalCache()
         {
             List<String> mediaFiles = new List<String>();
-            string defaultPlaylistPath = Path.Join(_localContentFolderPath, DefaultPlayListName);
+            string defaultPlaylistPath = _settings.StartupPlaylistPath;
             string localMediaFolder = DetermineLocalMediaFolderPath();
             string newPlaylistPath = Path.Join(localMediaFolder, "playlist.txt");
             string incompleteCopyTaskMarker = IncompleteCopyTaskMarker(localMediaFolder);
@@ -137,14 +126,14 @@ namespace ContentRotator
                 // Пустой файл
             }
             //Копируем файлы
-            string[] filesToCopy = Directory.GetFiles(_remoteContentFolderPath);
+            string[] filesToCopy = Directory.GetFiles(_settings.RemoteContentFolderPath);
             foreach (string filePath in filesToCopy)
             {
                 string fileName = Path.GetFileName(filePath);
                 string fileExtension = Path.GetExtension(filePath);
                 string destFilePath = Path.Join(localMediaFolder, fileName);
                 // Только файлы с допустимыми расширениями берём в работу
-                if (AlowedExtensions.Contains(fileExtension))
+                if (_settings.AllowedExtensions.Contains(fileExtension))
                 {
                     File.Copy(filePath, destFilePath, true);
                     // Сохраняем в список, чтобы вернуть
