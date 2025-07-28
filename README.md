@@ -64,7 +64,7 @@
  1. Скачать и установить
     * [плеер MPV](https://mpv.io/installation/), 
     * [.NET Runtime 9](https://dotnet.microsoft.com/en-us/download/dotnet/9.0);
-2. Создать каталог для хранения медиафайлов и плелистов;
+2. Создать каталог для хранения медиафайлов и плейлистов;
 3. Указать в файле конфигурации `appsettings.json`:
     * `MpvExecutable` путь к mpv.exe,
     * `RemoteContentFolderPath` путь к сетевому каталогу откуда брать медиафайлы,
