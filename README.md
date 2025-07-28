@@ -74,7 +74,6 @@
     * `MpvLogPath`, `WatchdogLogPath`, `ContentRotatorLogPath` пути к логфайлам;
 Остальные параметры можно оставить по умолчанию.
 4. Создать локального пользователя для запуска MpvWatchdogApp с паролем;
-5. Создать доменного пользователя для запуска ContentRotator;
 6. Настроить запуск назначенного задания для ContentRotator от имени `NETWORK SERVICE`;
 7. Настроить запуск MpvWatchDog:
     1. Используя утилиту [Autologon ](https://learn.microsoft.com/en-us/sysinternals/downloads/autologon), настроить автоматический вход в систему пользователя, от имени которого будет запущено приложение `MpvWatchdogApp`;
