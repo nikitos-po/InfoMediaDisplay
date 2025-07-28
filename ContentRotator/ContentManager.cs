@@ -1,5 +1,7 @@
-﻿using Microsoft.Extensions.Configuration;
-using MpvWatchdogApp;
+﻿using CommonLib;
+using Microsoft.Extensions.Configuration;
+using System.ComponentModel.DataAnnotations;
+using System.Reflection.PortableExecutable;
 
 namespace ContentRotator
 {
@@ -10,21 +12,40 @@ namespace ContentRotator
     public class ContentManager
     {
         private readonly AppSettings _settings;
-        public ContentManager(AppSettings settings)
+        private readonly FileLogger _logger;
+        public ContentManager(AppSettings settings, FileLogger logger)
         {
             _settings = settings;
+            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
             if (string.IsNullOrWhiteSpace(_settings.LocalContentFolderPath))
-                throw new ArgumentException("Folder path cannot be null or whitespace.", nameof(_settings.LocalContentFolderPath));
+            {
+                var errMsgText = $"Folder path cannot be null or whitespace. {nameof(_settings.LocalContentFolderPath)}";
+                _logger.Error(errMsgText);
+                throw new ArgumentException(errMsgText);
+            }
 
             if (!Directory.Exists(_settings.LocalContentFolderPath))
-                throw new DirectoryNotFoundException($"Folder does not exist: {_settings.LocalContentFolderPath}");
+            {
+                var errMsgText = $"Folder does not exist: {_settings.LocalContentFolderPath}";
+                _logger.Error(errMsgText);
+                throw new DirectoryNotFoundException(errMsgText);
+            }
 
             if (string.IsNullOrWhiteSpace(_settings.RemoteContentFolderPath))
-                throw new ArgumentException("Folder path cannot be null or whitespace.", nameof(_settings.RemoteContentFolderPath));
+            {
+                var errMsgText = $"Folder path cannot be null or whitespace. {nameof(_settings.RemoteContentFolderPath)}";
+                _logger.Error(errMsgText);
+                throw new ArgumentException(errMsgText);
+            }
 
             if (!Directory.Exists(_settings.RemoteContentFolderPath))
-                throw new DirectoryNotFoundException($"Folder does not exist: {_settings.RemoteContentFolderPath}");
+            {
+                var errMsgText = $"Folder does not exist: {_settings.RemoteContentFolderPath}";
+                _logger.Error(errMsgText);
+                throw new DirectoryNotFoundException(errMsgText);
+            }
+
         }
 
         public string[] LocalMediaContentFolders
@@ -58,6 +79,7 @@ namespace ContentRotator
                 if (!Directory.Exists(subfolder))
                 {
                     Directory.CreateDirectory(subfolder);
+                    _logger.Debug($"Created new media folder: {subfolder}");
                     return subfolder;
                 }
                 if (!HasAnyFile(subfolder))
@@ -74,7 +96,9 @@ namespace ContentRotator
                     return subfolder;
                 }
             }
-            throw new ArgumentException("No sutable folders.", nameof(_settings.LocalContentFolderPath));
+            var errMsgText = $"No suitable folders found in {_settings.LocalContentFolderPath}.";
+            _logger.Error(errMsgText);
+            throw new ArgumentException(errMsgText);
         }
 
         /// <summary>
@@ -85,7 +109,10 @@ namespace ContentRotator
         public static bool HasAnyFile(string folderPath)
         {
             if (string.IsNullOrWhiteSpace(folderPath))
-                throw new ArgumentException("Folder path cannot be null or whitespace.", nameof(folderPath));
+            {
+                var errMsgText = $"Folder path cannot be null or whitespace. {nameof(folderPath)}";
+                throw new ArgumentException(errMsgText);
+            }
 
             if (!Directory.Exists(folderPath))
                 throw new DirectoryNotFoundException($"Folder does not exist: {folderPath}");
@@ -117,7 +144,9 @@ namespace ContentRotator
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"Failed to delete file {file}: {ex.Message}");
+                    var errMsgText = $"Failed to delete file {file}: {ex.Message}";
+                    _logger.Error(errMsgText);
+                    Console.WriteLine(errMsgText);
                 }
             }
             // Создаём маркер

@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace MpvWatchdogApp
+namespace CommonLib
 {
     public class AppSettings
     {
@@ -15,6 +15,7 @@ namespace MpvWatchdogApp
         public string StartupPlaylistPath { get; set; }
         public string MpvLogPath { get; set; }
         public string WatchdogLogPath { get; set; }
+        public string ContentRotatorLogPath { get; set; }
         public int CheckIntervalMs { get; set; }
         public List<string> ContentSubfolders { get; set; }
         public string IncompleteTaskMarker { get; set; }

@@ -1,6 +1,6 @@
 ﻿using ContentRotator;
 using Microsoft.Extensions.Configuration;
-using MpvWatchdogApp;
+using CommonLib;
 
 var config = new ConfigurationBuilder()
                            .SetBasePath(AppContext.BaseDirectory) // base directory to find appsettings.json
@@ -10,13 +10,17 @@ var config = new ConfigurationBuilder()
 var settings = new AppSettings();
 config.Bind(settings);
 
-Console.WriteLine("Content Rotator Started.");
-Console.WriteLine($"Remote content folder: {settings.RemoteContentFolderPath}");
-Console.WriteLine($"Local cache folder: {settings.LocalContentFolderPath}");
-Console.WriteLine($"Named pipe to send commands: {settings.PipeName}");
+var loggerContentRotator = new FileLogger(settings.ContentRotatorLogPath);
+
+loggerContentRotator.Info("Content Rotator Started.");
+loggerContentRotator.Info($"Launched on behalf of: {Environment.UserDomainName}\\{Environment.UserName}");
+loggerContentRotator.Info($"Remote content folder: {settings.RemoteContentFolderPath}");
+loggerContentRotator.Info($"Local cache folder: {settings.LocalContentFolderPath}");
+loggerContentRotator.Info($"Named pipe to send commands: {settings.PipeName}");
+loggerContentRotator.Info($"Checking every {settings.CheckIntervalMs} ms.");
 //
-var controlPipe = new NamedPipeClient(settings.PipeName);
-var сontentManager = new ContentManager(settings);
+var controlPipe = new NamedPipeClient(settings.PipeName, loggerContentRotator);
+var сontentManager = new ContentManager(settings, loggerContentRotator);
 
 // обновим локальный кэш
 var newPlaylistPath = сontentManager.MakeLocalCache();
@@ -29,7 +33,15 @@ controlPipe.SendCommand(commandText);
 
 //очистим остальные папки
 string currentPath = Path.GetDirectoryName(newPlaylistPath);
+if (string.IsNullOrEmpty(currentPath))
+{
+    var errMsgText = "Failed to determine current path from the new playlist path.";
+    loggerContentRotator.Error(errMsgText);
+    Console.WriteLine(errMsgText);
+    return;
+}
 Console.WriteLine(newPlaylistPath);
+loggerContentRotator.Info($"Current path: {currentPath}");
 
 foreach (var path in сontentManager.LocalMediaContentFolders.Where(p => !p.Equals(currentPath)))
 {
@@ -40,6 +52,7 @@ foreach (var path in сontentManager.LocalMediaContentFolders.Where(p => !p.Equa
         using (FileStream fs = File.Create(incompleteCopyTaskMarker))
         {
             // Пустой файл
+            loggerContentRotator.Debug($"Created incomplete copy task marker: {incompleteCopyTaskMarker}");
         }
         string[] files = Directory.GetFiles(path);
         bool taskCopleted = true;
@@ -48,30 +61,39 @@ foreach (var path in сontentManager.LocalMediaContentFolders.Where(p => !p.Equa
             try
             {
                 File.Delete(file);
-                Console.WriteLine($"Deleted file: {file}");
+                var msgText = $"Deleted file: {file}";
+                loggerContentRotator.Debug(msgText);
+                Console.WriteLine(msgText);
             }
             catch (IOException)
             {
                 // File is likely busy or locked; skip it silently or log if needed
-                Console.WriteLine($"Skipped busy or locked file: {file}");
+                var msgText = $"Skipped busy or locked file: {file}";
+                loggerContentRotator.Warning(msgText);
+                Console.WriteLine(msgText);
                 taskCopleted = false;
             }
             catch (UnauthorizedAccessException)
             {
                 // No permission to delete; skip or log
-                Console.WriteLine($"Skipped unauthorized file: {file}");
+                var msgText = $"Skipped unauthorized file: {file}";
+                loggerContentRotator.Warning(msgText);
+                Console.WriteLine(msgText);
                 taskCopleted = false;
             }
             catch (Exception ex)
             {
                 // Other exceptions: log and continue
-                Console.WriteLine($"Failed to delete file {file}: {ex.Message}");
+                var msgText = $"Failed to delete file {file}: {ex.Message}";
+                loggerContentRotator.Error(msgText);
+                Console.WriteLine(msgText);
                 taskCopleted = false;
             }
         }
-        if(taskCopleted)
+        if (taskCopleted)
         {
             File.Delete(incompleteCopyTaskMarker);
+            loggerContentRotator.Debug($"Deleted incomplete copy task marker: {incompleteCopyTaskMarker}");
         }
     }
 }

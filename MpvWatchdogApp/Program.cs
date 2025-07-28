@@ -1,6 +1,7 @@
 ﻿using System.Diagnostics;
 using System.IO.Pipes;
 using Microsoft.Extensions.Configuration;
+using CommonLib;
 
 namespace MpvWatchdogApp
 {
@@ -17,25 +18,28 @@ namespace MpvWatchdogApp
             // Bind config to strongly-typed class
             config.Bind(Settings);
 
-            Console.WriteLine("MPV Watchdog Started.");
-            Console.WriteLine($"Executable: {Settings.MpvExecutable}");
-            Console.WriteLine($"Startup Playlist Path: {Settings.StartupPlaylistPath}");
-            Console.WriteLine($"Checking every {Settings.CheckIntervalMs} ms.");
-            Console.WriteLine($"Named pipe to check: {Settings.PipeName}\n");
-            Console.WriteLine($"MPV logfile: {Settings.MpvLogPath}\n");
+            var loggerMpvWatchdog = new FileLogger(Settings.WatchdogLogPath);
+
+            loggerMpvWatchdog.Info("MPV Watchdog Started.");
+            loggerMpvWatchdog.Info($"Executable: {Settings.MpvExecutable}");
+            loggerMpvWatchdog.Info($"Startup Playlist Path: {Settings.StartupPlaylistPath}");
+            loggerMpvWatchdog.Info($"Checking every {Settings.CheckIntervalMs} ms.");
+            loggerMpvWatchdog.Info($"Named pipe to check: {Settings.PipeName}");
+            loggerMpvWatchdog.Info($"MPV logfile: {Settings.MpvLogPath}");
 
             using CancellationTokenSource cts = new CancellationTokenSource();
             Console.CancelKeyPress += (sender, e) =>
             {
+                loggerMpvWatchdog.Info($"Stopping watchdog");
                 Console.WriteLine("Stopping watchdog...");
                 cts.Cancel();
                 e.Cancel = true;
             };
 
-            await MonitorMpvLoopAsync(cts.Token);
+            await MonitorMpvLoopAsync(cts.Token, loggerMpvWatchdog);
         }
 
-        private static async Task MonitorMpvLoopAsync(CancellationToken token)
+        private static async Task MonitorMpvLoopAsync(CancellationToken token, FileLogger loggerMpvWatchdog)
         {
             Process mpvProcess = null;
 
@@ -51,16 +55,22 @@ namespace MpvWatchdogApp
 
                 if (!mpvRunning)
                 {
-                    Console.WriteLine($"{DateTime.Now}: MPV not running. Starting MPV...");
+                    var msgText = $"MPV not running.";
+                    loggerMpvWatchdog.Info(msgText);
+                    Console.WriteLine($"{DateTime.Now}: {msgText}");
                     mpvProcess = StartMpv();
                 }
                 else if (!pipeExists)
                 {
-                    Console.WriteLine($"{DateTime.Now}: MPV running but named pipe does not exist. Restarting MPV...");
+                    var msgText = $"MPV running but named pipe {Settings.PipeName} does not exist. Restarting MPV...";
+                    loggerMpvWatchdog.Info(msgText);
+                    Console.WriteLine($"{DateTime.Now}: {msgText}");
                     try
                     {
                         if (!mpvProcess.HasExited)
                         {
+                            msgText = $"Killing MPV process with PID {mpvProcess.Id}...";
+                            loggerMpvWatchdog.Info(msgText);
                             mpvProcess.Kill();
                             mpvProcess.WaitForExit(3000);
                         }
@@ -68,7 +78,9 @@ namespace MpvWatchdogApp
                     }
                     catch (Exception ex)
                     {
-                        Console.WriteLine($"Failed to kill MPV process: {ex.Message}");
+                        msgText = $"Failed to kill MPV process: {ex.Message}";
+                        loggerMpvWatchdog.Error(msgText);
+                        Console.WriteLine($"{DateTime.Now}: {msgText}");
                     }
                     mpvProcess = StartMpv();
                 }
